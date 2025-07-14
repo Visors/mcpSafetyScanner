@@ -63,7 +63,18 @@ def select_embedder():
     """
     Select embedder based on environment variables
     """
-    if getenv("AZURE_OPENAI_API_KEY"):
+    if getenv("HUGGINGFACE_API_KEY"):
+        # Support for HuggingFace API embeddings
+        try:
+            from agno.embedder.huggingface import HuggingfaceCustomEmbedder
+            return HuggingfaceCustomEmbedder(
+                id=getenv("HUGGINGFACE_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B"),
+                api_key=getenv("HUGGINGFACE_API_KEY"),
+            )
+        except ImportError:
+            console.print(":x: HF package not installed")
+            exit(1)
+    elif getenv("AZURE_OPENAI_API_KEY"):
         try:
             from agno.embedder.azure_openai import AzureOpenAIEmbedder
             return AzureOpenAIEmbedder(
@@ -73,7 +84,8 @@ def select_embedder():
                 api_version=getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_VERSION"),
             )
         except ImportError:
-            console.print
+            console.print(":x: Azure OpenAI embedder package not installed")
+            exit(1)
     else:
         try:
             from agno.embedder.openai import OpenAIEmbedder
@@ -82,14 +94,29 @@ def select_embedder():
                 api_key=getenv("OPENAI_API_KEY"),
             )
         except ImportError:
-            console.print(":x: openai package not installed")
+            console.print(":x: OpenAI package not installed")
             exit(1)
         
 def select_llm():
     """
     Looks at environment configs to determine what LLM to use. 
     """
-    if getenv("AZURE_OPENAI_API_KEY"):
+    if getenv("OPENAI_LIKE_API_KEY"):
+        # Support for OpenAI Like models
+        try:
+            from agno.models.openai.like import OpenAILike
+        except ImportError:
+            console.print(":x: Import Error with OpenAI Like")
+        # model = "Qwen/Qwen3-235B-A22B"
+
+        llm = OpenAILike(
+            id=getenv("OPENAI_LIKE_MODEL", "Qwen/Qwen3-235B-A22B"),
+            api_key=getenv("OPENAI_LIKE_API_KEY"),
+            base_url=getenv("OPENAI_LIKE_BASE_URL", "https://api.siliconflow.cn/v1"),
+        )
+        print(llm)
+        return llm
+    elif getenv("AZURE_OPENAI_API_KEY"):
         try:
             from agno.models.azure import AzureOpenAI 
         except ImportError:
@@ -331,6 +358,7 @@ async def run_stdio_mcp_server(server_params: List[StdioServerParameters], serve
             enable_team_history=True,
             telemetry=False,
             debug_mode=True,
+            model=select_llm(),
         )
         
         # Run the analysis
@@ -440,3 +468,4 @@ if __name__ == "__main__":
     asyncio.run(
         main()
     )
+
